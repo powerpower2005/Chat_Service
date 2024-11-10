@@ -1,0 +1,30 @@
+{
+    "name": "Chat App Dev Environment",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "app",
+    "workspaceFolder": "/workspace",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "vue.volar",                    // Vue 3 지원
+                "dbaeumer.vscode-eslint",       // ESLint
+                "ms-python.python",             // Python
+                "ms-python.vscode-pylance",     // Python 타입 체크
+                "mongodb.mongodb-vscode"        // MongoDB
+
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python3",
+                "python.analysis.typeCheckingMode": "basic"
+            }
+        }
+    },
+    "forwardPorts": [
+        8000,  // FastAPI
+        8080,  // Vue
+        6379,  // Redis
+        27017  // MongoDB
+    ],
+    "postCreateCommand": "pip install --no-cache-dir -r ./backend/requirements.txt",
+    "remoteUser": "root"
+} 
