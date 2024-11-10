@@ -58,22 +58,3 @@ backend/
 ### 사용자
 - `GET /users/search`: 사용자 검색
 
-## 환경 변수
-
-# 서버 설정
-HOST=
-PORT=
-
-# 데이터베이스 설정
-MONGODB_URL=mongodb://localhost:27017
-DB_NAME=chat_db
-
-# Redis 설정
-REDIS_URL=redis://localhost:6379
-
-# JWT 설정
-SECRET_KEY=example-key  # 실제 운영환경에서는 안전한 키로 변경 필요
-ACCESS_TOKEN_EXPIRE_MINUTES=60
-
-# CORS 설정
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
