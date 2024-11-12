@@ -1,0 +1,27 @@
+name: Update Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_version:
+        description: '새로운 major.minor 버전 (예: 1.1)'
+        required: true
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Update version file
+        run: |
+          echo "version:" > .github/version.yml
+          echo "  major_minor: \"${{ github.event.inputs.new_version }}\"" >> .github/version.yml
+          
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .github/version.yml
+          git commit -m "버전 업데이트: ${{ github.event.inputs.new_version }}"
+          git push

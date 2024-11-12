@@ -1,4 +1,12 @@
-# terraform/local/main.tf
+# 테라폼 상태 관리를 위한 백엔드 설정
+# local 로 테라폼의 상태를 관리하는 것은 로컬 환경에서만 하는 것으로
+# 협업 시에는 따로 관리할 것
+terraform {
+  backend "local" {
+    path = "terraform.tfstate"  # 로컬 상태 파일 경로
+  }
+}
+
 resource "kubernetes_namespace" "chat_dev" {
   metadata {
     name = "chat-dev"
