@@ -14,14 +14,14 @@ class ChatService:
         self.chat_messages = self.db["chat_messages"]
 
     def create_room(self, room: ChatRoom) -> ChatRoom:
-        """새로운 채팅방 생성"""
+        """Create a new chat room"""
         room_dict = room.dict(exclude={'id'})
         result = self.chat_rooms.insert_one(room_dict)
         room.id = str(result.inserted_id)
         return room
 
     def get_room(self, room_id: str) -> Optional[ChatRoom]:
-        """채팅방 정보 조회"""
+        """Get chat room information"""
         room_data = self.chat_rooms.find_one({"_id": ObjectId(room_id)})
         if room_data:
             room_data['id'] = str(room_data.pop('_id'))
@@ -29,7 +29,7 @@ class ChatService:
         return None
 
     def add_participant(self, room_id: str, user_id: str) -> bool:
-        """채팅방에 참가자 추가"""
+        """Add a participant to the chat room"""
         result = self.chat_rooms.update_one(
             {"_id": ObjectId(room_id)},
             {"$addToSet": {"participants": user_id}}
@@ -37,7 +37,7 @@ class ChatService:
         return result.modified_count > 0
 
     def save_message(self, message: ChatMessageCreate) -> ChatMessageDB:
-        """채팅 메시지 저장"""
+        """Save chat message"""
         message_data = message.dict()
         message_data["id"] = str(ObjectId())
         message_db = ChatMessageDB(**message_data)
@@ -47,7 +47,7 @@ class ChatService:
         return message_db
 
     async def get_room_messages(self, room_id: str, limit: int = 100) -> List[ChatMessageDB]:
-        """채팅방의 메시지 이력 조회"""
+        """Get message history for the chat room"""
         messages = []
         cursor = self.chat_messages.find(
             {"room_id": room_id, "is_deleted": False}
@@ -60,7 +60,7 @@ class ChatService:
         return messages
 
     def remove_participant(self, room_id: str, user_id: str) -> bool:
-        """채팅방에서 참가자 제거"""
+        """Remove a participant from the chat room"""
         result = self.chat_rooms.update_one(
             {"_id": ObjectId(room_id)},
             {"$pull": {"participants": user_id}}
@@ -68,7 +68,7 @@ class ChatService:
         return result.modified_count > 0
 
     def get_rooms(self) -> List[ChatRoom]:
-        """모든 채팅방 목록 조회"""
+        """Get list of all chat rooms"""
         try:
             rooms = []
             cursor = self.chat_rooms.find()

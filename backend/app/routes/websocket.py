@@ -18,7 +18,7 @@ async def websocket_endpoint(
     room_id: str,
     token: str = Query(...)
 ):
-    """WebSocket 엔드포인트"""
+    """WebSocket endpoint"""
     try:
         email = decode_token(token)
         user = user_service.get_user_by_email(email)
@@ -28,7 +28,7 @@ async def websocket_endpoint(
 
         await manager.connect(websocket, room_id)
         
-        # 이전 메시지 히스토리 전송
+        # Send previous message history
         messages = await chat_service.get_room_messages(room_id)
         for message in messages:
             await websocket.send_json({
@@ -37,7 +37,7 @@ async def websocket_endpoint(
                 "sender_id": message.sender_id,
                 "username": user_service.get_user(message.sender_id).username,
                 "created_at": str(message.created_at),
-                "type": "history"  # 히스토리 메시지임을 표시
+                "type": "history"  # Indicate this is a history message
             })
         
         while True:
@@ -58,7 +58,7 @@ async def websocket_endpoint(
                     "sender_id": saved_message.sender_id,
                     "username": user.username,
                     "created_at": str(saved_message.created_at),
-                    "type": "message"  # 실시간 메시지임을 표시
+                    "type": "message"  # Indicate this is a real-time message
                 }),
                 room_id
             )
@@ -68,7 +68,7 @@ async def websocket_endpoint(
         await manager.broadcast(
             json.dumps({
                 "type": "system",
-                "content": f"{user.username}님이 채팅방을 나갔습니다.",
+                "content": f"{user.username} has left the chat room.",
                 "timestamp": str(datetime.utcnow())
             }),
             room_id

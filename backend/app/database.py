@@ -17,5 +17,5 @@ class Database:
             self.connect_to_database()
         return self.client[settings.db_name]
 
-# 데이터베이스 인스턴스 생성
+# Create database instance
 db = Database()

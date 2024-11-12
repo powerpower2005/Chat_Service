@@ -15,10 +15,10 @@ async def search_users(
     current_user: User = Depends(get_current_user)
 ):
     """
-    이메일로 사용자를 검색합니다.
-    q: 검색어 (이메일)
+    Search users by email.
+    q: search query (email)
     """
     users = user_service.search_users(q)
-    # 현재 사용자는 검색 결과에서 제외
+    # Exclude current user from search results
     users = [user for user in users if user.id != current_user.id]
     return users 

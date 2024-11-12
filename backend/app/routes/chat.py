@@ -52,7 +52,7 @@ def create_chat_room(
 
 @router.get("/rooms/{room_id}")
 async def get_room(room_id: str, current_user: User = Depends(get_current_user)):
-    """채팅방 정보 조회"""
+    """Get chat room information"""
     room = chat_service.get_room(room_id)
     if not room:
         raise HTTPException(
@@ -71,7 +71,7 @@ async def join_chat_room(
     room_id: str,
     token: str = Depends(oauth2_scheme)
 ):
-    """채팅방 참여"""
+    """Join chat room"""
     user = user_service.get_user_by_email(token)
     if not user:
         raise HTTPException(
@@ -91,7 +91,7 @@ async def get_chat_messages(
     room_id: str,
     token: str = Depends(oauth2_scheme)
 ):
-    """채팅방 메시지 이력 조회"""
+    """Get chat room message history"""
     messages = await chat_service.get_room_messages(room_id)
     return messages
 
@@ -100,7 +100,7 @@ async def leave_chat_room(
     room_id: str,
     token: str = Depends(oauth2_scheme)
 ):
-    """채팅방 나가기"""
+    """Leave chat room"""
     user = await user_service.get_user_by_email(token)
     if not user:
         raise HTTPException(
@@ -117,7 +117,7 @@ async def leave_chat_room(
 
 @router.get("/rooms", response_model=List[ChatRoom])
 def get_chat_rooms(token: str = Depends(oauth2_scheme)):
-    """모든 채팅방 목록 조회"""
+    """Get all chat rooms list"""
     try:
         rooms = chat_service.get_rooms()
         logger.info(f"Successfully retrieved chat rooms")
@@ -135,27 +135,27 @@ async def invite_to_chat(
     user_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    # 방이 존재하는지 확인
+    # Check if room exists
     room = chat_service.get_room(room_id)
     if not room:
-        raise HTTPException(status_code=404, detail="채팅방을 찾을 수 없습니다")
+        raise HTTPException(status_code=404, detail="Chat room not found")
     
-    # 초대하는 사람이 해당 방의 참가자인지 확인
+    # Check if the inviting user is a participant in the room
     if current_user.id not in room.participants:
-        raise HTTPException(status_code=403, detail="초대 권한이 없습니다")
+        raise HTTPException(status_code=403, detail="No permission to invite")
     
-    # 사용자가 존재하는지 확인
+    # Check if user exists
     invited_user = user_service.get_user(user_id)
     if not invited_user:
-        raise HTTPException(status_code=404, detail="초대할 사용자를 찾을 수 없습니다")
+        raise HTTPException(status_code=404, detail="Invited user not found")
     
-    # 이미 참가자인지 확인
+    # Check if already a participant
     if user_id in room.participants:
-        raise HTTPException(status_code=400, detail="이미 채팅방에 참가중인 사용자입니다")
+        raise HTTPException(status_code=400, detail="User is already a participant in the chat room")
     
-    # 참가자 추가
+    # Add participant
     success = chat_service.add_participant(room_id, user_id)
     if success:
-        return {"message": "사용자가 성공적으로 초대되었습니다"}
+        return {"message": "User has been successfully invited"}
     else:
-        raise HTTPException(status_code=500, detail="초대 처리 중 오류가 발생했습니다")
+        raise HTTPException(status_code=500, detail="Error occurred while processing invitation")
