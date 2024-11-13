@@ -54,3 +54,21 @@ resource "kubernetes_deployment" "mongodb" {
     }
   }
 }
+
+resource "kubernetes_service" "mongodb" {
+  metadata {
+    name      = "mongodb"
+    namespace = var.namespace
+  }
+
+  spec {
+    selector = {
+      app = "mongodb"
+    }
+
+    port {
+      port        = 27017
+      target_port = 27017
+    }
+  }
+}
