@@ -1,5 +1,8 @@
 name: CI Pipeline
 
+
+# Trigger 
+# - push: main, develop
 on:
   push:
     branches: [ main, develop ]
@@ -8,27 +11,64 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # Github Actions Provide environment for free
+
+    # Steps
     steps:
+      - name: Slack Notification - Start
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          fields: workflow,job,commit,repo,ref,author,took
+          custom_payload: |
+            {
+              "attachments": [{
+                "color": "#36a64f",
+                "text": ":rocket: 빌드 파이프라인이 시작되었습니다.\n커밋: ${{ github.event.head_commit.message }}"
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0  # 모든 태그 정보를 가져오기 위해 필요
       
+      # Read version from yaml
       - name: Read version from yaml
         id: read_version
+        continue-on-error: true
         run: |
           MAJOR_MINOR=$(yq eval '.version.major_minor' .github/version.yml)
           echo "major_minor=$MAJOR_MINOR" >> $GITHUB_OUTPUT
-      
+
+      - name: Slack Notification - Version Read
+        if: steps.read_version.outcome == 'failure'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          fields: workflow,job,commit,repo,ref,author,took
+          custom_payload: |
+            {
+              "attachments": [{
+                "color": "#ff0000",
+                "text": ":x: 버전 읽기 실패\n${{ steps.read_version.outputs.error }}"
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
       - name: Generate version
         id: version
+        continue-on-error: true
         run: |
-          # 현재 major.minor 버전의 가장 최신 태그 찾기
           latest_tag=$(git tag -l "${{ steps.read_version.outputs.major_minor }}.*" | sort -V | tail -n 1)
           
           if [ -z "$latest_tag" ]; then
+            # No tag, start with .0
             new_patch=0
           else
+            # Add 1 to current patch version
             current_patch=$(echo $latest_tag | cut -d. -f3)
             new_patch=$((current_patch + 1))
           fi
@@ -36,13 +76,56 @@ jobs:
           new_version="${{ steps.read_version.outputs.major_minor }}.$new_patch"
           echo "version=$new_version" >> $GITHUB_OUTPUT
           
+          # Create new tag
           git tag $new_version
           git push origin $new_version
 
+      - name: Slack Notification - Version Generate
+        if: steps.version.outcome == 'failure'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          fields: workflow,job,commit,repo,ref,author,took
+          custom_payload: |
+            {
+              "attachments": [{
+                "color": "#ff0000",
+                "text": ":x: 버전 생성 실패\n${{ steps.version.outputs.error }}"
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
       - name: Build and push to local registry
+        id: build
+        continue-on-error: true
         run: |
           docker build -t localhost:5000/your-app:${{ steps.version.outputs.version }} .
           docker push localhost:5000/your-app:${{ steps.version.outputs.version }}
           
           docker tag localhost:5000/your-app:${{ steps.version.outputs.version }} localhost:5000/your-app:latest
           docker push localhost:5000/your-app:latest
+
+      - name: Slack Notification - Build Result
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          fields: workflow,job,commit,repo,ref,author,took
+          custom_payload: |
+            {
+              "attachments": [{
+                "color": "${{ steps.build.outcome == 'success' && '#36a64f' || '#ff0000' }}",
+                "text": "${{ steps.build.outcome == 'success' && ':white_check_mark: 빌드 성공' || ':x: 빌드 실패' }}\n버전: ${{ steps.version.outputs.version }}"
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack Notification - Final Status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: workflow,job,commit,repo,ref,author,took
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
