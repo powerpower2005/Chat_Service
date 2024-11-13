@@ -6,61 +6,144 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+  # major.minor 버전은 환경 변수로 관리하여 필요할 때 수동으로 변경
+  MAJOR_VERSION: 1
+  MINOR_VERSION: 0
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      # 현재 패치 버전 가져오기
+      - name: Get current version
+        id: version
+        run: |
+          # 현재 패치 버전 가져오기 (없으면 0으로 시작)
+          CURRENT_PATCH=$(curl -s http://localhost:5000/v2/chat-backend/tags/list | jq -r '.tags[]' | grep "^${MAJOR_VERSION}.${MINOR_VERSION}." | sort -V | tail -n1 | cut -d. -f3 || echo "0")
+          NEW_PATCH=$((CURRENT_PATCH + 1))
+          echo "version=${MAJOR_VERSION}.${MINOR_VERSION}.${NEW_PATCH}" >> $GITHUB_OUTPUT
 
-      - name: Set up Minikube
-        uses: medyagh/setup-minikube@master
+      # 이미지 빌드 및 푸시
+      - name: Build and Push Backend Image
+        id: build-backend
+        run: |
+          cd backend
+          docker build -t localhost:5000/chat-backend:${{ steps.version.outputs.version }} .
+          docker push localhost:5000/chat-backend:${{ steps.version.outputs.version }}
+
+      - name: Build and Push Frontend Image
+        id: build-frontend
+        run: |
+          cd frontend
+          docker build -t localhost:5000/chat-frontend:${{ steps.version.outputs.version }} .
+          docker push localhost:5000/chat-frontend:${{ steps.version.outputs.version }}
       
-      # 1. Registry 네임스페이스 및 서비스 배포
+      - name: Notify Image Build Status
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🏗️ 이미지 빌드 상태",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*이미지 빌드 결과*\n- 버전: ${{ steps.version.outputs.version }}\n- Backend: ${{ steps.build-backend.outcome }}\n- Frontend: ${{ steps.build-frontend.outcome }}"
+                  }
+                }
+              ]
+            }
+
+      # Stage 1: Registry 배포
       - name: Deploy Registry
+        id: deploy-registry
         run: |
           cd terraform/stage1-registry
           terraform init
           terraform apply -auto-approve
-          
-          # Registry가 준비될 때까지 대기
-          kubectl wait --for=condition=available --timeout=60s deployment/registry -n registry
-          # 포트 포워딩
-          kubectl port-forward -n registry svc/registry 5000:5000 &
-          sleep 10
       
-      # 2. 이미지 빌드 및 푸시
-      - name: Build and Push Images
-        run: |
-          # Backend 이미지
-          cd backend
-          docker build -t localhost:5000/chat-backend:${{ github.sha }} .
-          docker push localhost:5000/chat-backend:${{ github.sha }}
-          
-          # Frontend 이미지
-          cd ../frontend
-          docker build -t localhost:5000/chat-frontend:${{ github.sha }} .
-          docker push localhost:5000/chat-frontend:${{ github.sha }}
-      
-      # 3. 나머지 인프라 (MongoDB, Redis 등) 배포
+      - name: Notify Registry Deployment
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🚀 Registry 배포 완료"
+            }
+
+      # Stage 2: 기본 인프라 배포
       - name: Deploy Infrastructure
+        id: deploy-infra
         run: |
           cd terraform/stage2-infra
           terraform init
           terraform apply -auto-approve
-          
-          # MongoDB와 Redis가 준비될 때까지 대기
-          kubectl wait --for=condition=available --timeout=60s deployment/mongodb -n chat-dev
-          kubectl wait --for=condition=available --timeout=60s deployment/redis -n chat-dev
       
-      # 4. 애플리케이션 배포
+      - name: Notify Infrastructure Deployment Status
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🏗️ 인프라 배포 상태",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*인프라 배포 ${{ steps.deploy-infra.outcome }}*\n${{ steps.deploy-infra.outcome == 'success' && '✅ 성공' || '❌ 실패' }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK }}
+
+      # Stage 3: 애플리케이션 배포
       - name: Deploy Applications
+        id: deploy-apps
         run: |
           cd terraform/stage3-apps
-          
-          # 현재 커밋 SHA를 이미지 태그로 사용
-          export TF_VAR_backend_version=${{ github.sha }}
-          export TF_VAR_frontend_version=${{ github.sha }}
-          
           terraform init
-          terraform apply -auto-approve 
+          terraform apply -auto-approve
+      
+      - name: Notify Applications Deployment Status
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "📱 애플리케이션 배포 상태",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*애플리케이션 배포 ${{ steps.deploy-apps.outcome }}*\n${{ steps.deploy-apps.outcome == 'success' && '✅ 성공' || '❌ 실패' }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK }}
+
+      # 최종 배포 상태 알림
+      - name: Final Deployment Status
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🎉 전체 배포 완료",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*배포 최종 상태*\n- Registry: ${{ steps.deploy-registry.outcome }}\n- 인프라: ${{ steps.deploy-infra.outcome }}\n- 애플리케이션: ${{ steps.deploy-apps.outcome }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK }} 
