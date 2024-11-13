@@ -40,3 +40,23 @@ resource "helm_release" "argocd" {
     value = "NodePort"
   }
 }
+
+# 레지스트리를 위한 네임스페이스 생성
+resource "kubernetes_namespace" "registry" {
+  metadata {
+    name = "registry"
+  }
+}
+
+# 레지스트리 모듈 호출
+module "registry" {
+  source = "../modules/registry"
+  
+  namespace    = kubernetes_namespace.registry.metadata[0].name
+  storage_size = "10Gi"
+  storage_path = "/data/registry"
+  
+  # 필요한 경우 다른 변수들도 오버라이드 가능
+  # name = "custom-registry"
+  # service_type = "ClusterIP"
+}
