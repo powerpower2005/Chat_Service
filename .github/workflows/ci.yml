@@ -12,6 +12,7 @@ env:
   FRONTEND_IMAGE_NAME: ${{ github.repository }}/chat-frontend
   MAJOR_VERSION: 1
   MINOR_VERSION: 0
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 jobs:
   build:
@@ -41,6 +42,8 @@ jobs:
                 }
               ]
             }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       # GHCR 로그인
       - name: Login to GitHub Container Registry
@@ -144,41 +147,47 @@ jobs:
       # 최종 상태 알림
       - name: Get image catalog and send final status
         if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "✨ CI 빌드 최종 결과",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*CI 빌드 완료*\n- 버전: ${{ steps.version.outputs.version }}\n- Backend: ${{ steps.build-backend.outcome }}\n- Frontend: ${{ steps.build-frontend.outcome }}\n- 최종 상태: ${{ job.status }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*최근 Backend 이미지 태그*\n\`\`\`${{ steps.get-tags.outputs.backend_tags }}\`\`\`"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*최근 Frontend 이미지 태그*\n\`\`\`${{ steps.get-tags.outputs.frontend_tags }}\`\`\`"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # 이미지 태그 조회
+      - name: Get image tags
+        id: get-tags
         run: |
-          # Backend 이미지 태그 조회
           BACKEND_TAGS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/user/packages/container/${{ env.BACKEND_IMAGE_NAME }}/versions" | \
             jq -r '.[].metadata.container.tags[]' | sort -V | tail -5)
-          
-          # Frontend 이미지 태그 조회
           FRONTEND_TAGS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/user/packages/container/${{ env.FRONTEND_IMAGE_NAME }}/versions" | \
             jq -r '.[].metadata.container.tags[]' | sort -V | tail -5)
-          
-          # Slack 메시지 전송
-          curl -X POST -H 'Content-type: application/json' --data "{
-            \"text\": \"✨ CI 빌드 최종 결과\",
-            \"blocks\": [
-              {
-                \"type\": \"section\",
-                \"text\": {
-                  \"type\": \"mrkdwn\",
-                  \"text\": \"*CI 빌드 완료*\n- 버전: ${{ steps.version.outputs.version }}\n- Backend: ${{ steps.build-backend.outcome }}\n- Frontend: ${{ steps.build-frontend.outcome }}\n- 최종 상태: ${{ job.status }}\"
-                }
-              },
-              {
-                \"type\": \"section\",
-                \"text\": {
-                  \"type\": \"mrkdwn\",
-                  \"text\": \"*최근 Backend 이미지 태그*\n\`\`\`${BACKEND_TAGS}\`\`\`\"
-                }
-              },
-              {
-                \"type\": \"section\",
-                \"text\": {
-                  \"type\": \"mrkdwn\",
-                  \"text\": \"*최근 Frontend 이미지 태그*\n\`\`\`${FRONTEND_TAGS}\`\`\`\"
-                }
-              }
-            ]
-          }" ${{ secrets.SLACK_WEBHOOK_URL }} 
+          echo "backend_tags=${BACKEND_TAGS}" >> $GITHUB_OUTPUT
+          echo "frontend_tags=${FRONTEND_TAGS}" >> $GITHUB_OUTPUT
