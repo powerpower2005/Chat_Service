@@ -57,16 +57,29 @@ jobs:
       - name: Get current version
         id: version
         run: |
-          # API를 통해 현재 태그 목록 가져오기
-          TAGS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          # API로 현재 태그 목록 가져오기
+          CURRENT_VERSION=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/user/packages/container/${{ env.BACKEND_IMAGE_NAME }}/versions" | \
-            jq -r '.[].metadata.container.tags[]' | grep "^${MAJOR_VERSION}.${MINOR_VERSION}." || echo "${MAJOR_VERSION}.${MINOR_VERSION}.0")
+            jq -r '.[].metadata.container.tags[]' | \
+            grep "^${MAJOR_VERSION}.${MINOR_VERSION}." | \
+            sort -V | \
+            tail -n1 || echo "${MAJOR_VERSION}.${MINOR_VERSION}.0")
           
-          # 현재 패치 버전 찾기
-          CURRENT_PATCH=$(echo "$TAGS" | sort -V | tail -n1 | cut -d. -f3 || echo "0")
-          NEW_PATCH=$((CURRENT_PATCH + 1))
+          # 현재 패치 버전 추출 및 증가
+          if [ -n "$CURRENT_VERSION" ]; then
+            CURRENT_PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+            NEW_PATCH=$((CURRENT_PATCH + 1))
+          else
+            NEW_PATCH=0
+          fi
+          
+          # 새 버전 설정
           NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.${NEW_PATCH}"
           echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          
+          # 디버깅용 출력
+          echo "Current version: $CURRENT_VERSION"
+          echo "New version: $NEW_VERSION"
 
       # 버전 설정 알림
       - name: Notify version
