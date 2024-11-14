@@ -31,7 +31,6 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚀 CI 빌드 시작",
               "blocks": [
                 {
                   "type": "section",
@@ -74,7 +73,6 @@ jobs:
         with:
           payload: |
             {
-              "text": "📌 버전 설정",
               "blocks": [
                 {
                   "type": "section",
@@ -103,7 +101,6 @@ jobs:
         with:
           payload: |
             {
-              "text": "🔨 Backend 빌드 완료",
               "blocks": [
                 {
                   "type": "section",
@@ -132,7 +129,6 @@ jobs:
         with:
           payload: |
             {
-              "text": "🔨 Frontend 빌드 완료",
               "blocks": [
                 {
                   "type": "section",
@@ -151,7 +147,6 @@ jobs:
         with:
           payload: |
             {
-              "text": "✨ CI 빌드 최종 결과",
               "blocks": [
                 {
                   "type": "section",
