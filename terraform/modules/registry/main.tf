@@ -1,13 +1,15 @@
-resource "kubernetes_persistent_volume" "registry_pv" {
+resource "kubernetes_persistent_volume" "registry" {
   metadata {
     name = "registry-pv"
   }
+
   spec {
     capacity = {
       storage = var.storage_size
     }
     access_modes = ["ReadWriteOnce"]
     storage_class_name = "standard"
+    persistent_volume_reclaim_policy = "Retain"
     persistent_volume_source {
       host_path {
         path = var.storage_path
@@ -16,11 +18,12 @@ resource "kubernetes_persistent_volume" "registry_pv" {
   }
 }
 
-resource "kubernetes_persistent_volume_claim" "registry_pvc" {
+resource "kubernetes_persistent_volume_claim" "registry" {
   metadata {
     name      = "registry-pvc"
     namespace = var.namespace
   }
+
   spec {
     access_modes = ["ReadWriteOnce"]
     resources {
@@ -28,39 +31,39 @@ resource "kubernetes_persistent_volume_claim" "registry_pvc" {
         storage = var.storage_size
       }
     }
-    storage_class_name = "standard"
+    volume_name = kubernetes_persistent_volume.registry.metadata[0].name
   }
 }
 
 resource "kubernetes_deployment" "registry" {
   metadata {
-    name      = var.name
+    name      = "registry"
     namespace = var.namespace
   }
 
   spec {
-    replicas = var.replicas
+    replicas = 1
 
     selector {
       match_labels = {
-        app = var.name
+        app = "registry"
       }
     }
 
     template {
       metadata {
         labels = {
-          app = var.name
+          app = "registry"
         }
       }
 
       spec {
         container {
-          image = var.registry_image
-          name  = var.name
+          image = "registry:2"
+          name  = "registry"
 
           port {
-            container_port = var.container_port
+            container_port = 5000
           }
 
           volume_mount {
@@ -72,7 +75,7 @@ resource "kubernetes_deployment" "registry" {
         volume {
           name = "registry-storage"
           persistent_volume_claim {
-            claim_name = kubernetes_persistent_volume_claim.registry_pvc.metadata[0].name
+            claim_name = kubernetes_persistent_volume_claim.registry.metadata[0].name
           }
         }
       }
@@ -82,20 +85,20 @@ resource "kubernetes_deployment" "registry" {
 
 resource "kubernetes_service" "registry" {
   metadata {
-    name      = var.name
+    name      = "registry"
     namespace = var.namespace
   }
 
   spec {
     selector = {
-      app = var.name
+      app = "registry"
     }
 
     port {
-      port        = var.service_port
-      target_port = var.container_port
+      port        = 5000
+      target_port = 5000
     }
 
-    type = var.service_type
+    type = "NodePort"
   }
 } 
