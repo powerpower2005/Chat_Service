@@ -236,7 +236,14 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*빌드 상태*\n• 버전: ${{ steps.version.outputs.version || 'N/A' }}\n• Backend: ${{ steps.build-backend.outcome || 'N/A' }}\n• Frontend: ${{ steps.build-frontend.outcome || 'N/A' }}\n• 최종 상태: ${{ job.status }}"
+                    "text": "*빌드 상태*\n• 버전: ${{ steps.version.outputs.version || 'N/A' }}\n• Backend: ${{ steps.build-backend.outcome || 'N/A' }} ${{ steps.build-backend.outcome == 'failure' && format('(에러: {0})', steps.build-backend.outputs.error) || '' }}\n• Frontend: ${{ steps.build-frontend.outcome || 'N/A' }} ${{ steps.build-frontend.outcome == 'failure' && format('(에러: {0})', steps.build-frontend.outputs.error) || '' }}\n• 최종 상태: ${{ job.status }} ${{ job.status == 'failure' && '- 이전 단계 실패로 인한 중단' || '' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*작업 단계 결과*\n• 코드 체크아웃: ${{ steps.checkout.outcome || 'N/A' }}\n• 버전 관리: ${{ steps.version.outcome || 'N/A' }}\n• GHCR 로그인: ${{ steps.login.outcome || 'N/A' }}\n• 이미지 빌드/푸시: ${{ steps.build-backend.outcome || 'N/A' }}/${{ steps.build-frontend.outcome || 'N/A' }}"
                   }
                 },
                 {
@@ -247,20 +254,6 @@ jobs:
                   "text": {
                     "type": "mrkdwn",
                     "text": "*푸시된 이미지*\n• Backend: `${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ steps.version.outputs.version }}`\n• Frontend: `${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ steps.version.outputs.version }}`"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*최근 Backend 이미지 태그*\n```${{ steps.get-tags.outputs.backend_tags || 'No tags found' }}```"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*최근 Frontend 이미지 태그*\n```${{ steps.get-tags.outputs.frontend_tags || 'No tags found' }}```"
                   }
                 }
               ]
