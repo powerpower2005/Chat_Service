@@ -43,6 +43,7 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       # GHCR 로그인
       - name: Login to GitHub Container Registry
@@ -83,6 +84,9 @@ jobs:
                 }
               ]
             }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       # Backend 이미지 빌드 & 푸시
       - name: Build and push backend image
@@ -111,6 +115,9 @@ jobs:
                 }
               ]
             }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       # Frontend 이미지 빌드 & 푸시
       - name: Build and push frontend image
@@ -139,40 +146,58 @@ jobs:
                 }
               ]
             }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       # 최종 상태 알림
-      - name: Get image catalog and send final status
+      - name: Send final status
         if: always()
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
             {
+              "text": "CI 빌드 결과",
+              "username": "GitHub Actions",
+              "icon_emoji": ":github:",
               "blocks": [
                 {
-                  "type": "section",
+                  "type": "header",
                   "text": {
-                    "type": "mrkdwn",
-                    "text": "*CI 빌드 완료*\n- 버전: ${{ steps.version.outputs.version }}\n- Backend: ${{ steps.build-backend.outcome }}\n- Frontend: ${{ steps.build-frontend.outcome }}\n- 최종 상태: ${{ job.status }}"
+                    "type": "plain_text",
+                    "text": "✨ CI 빌드 최종 결과",
+                    "emoji": true
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*최근 Backend 이미지 태그*\n```${{ steps.get-tags.outputs.backend_tags }}```"
+                    "text": "*빌드 상태*\n• 버전: ${{ steps.version.outputs.version || 'N/A' }}\n• Backend: ${{ steps.build-backend.outcome || 'N/A' }}\n• Frontend: ${{ steps.build-frontend.outcome || 'N/A' }}\n• 최종 상태: ${{ job.status }}"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*최근 Backend 이미지 태그*\n```${{ steps.get-tags.outputs.backend_tags || 'No tags found' }}```"
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*최근 Frontend 이미지 태그*\n```${{ steps.get-tags.outputs.frontend_tags }}```"
+                    "text": "*최근 Frontend 이미지 태그*\n```${{ steps.get-tags.outputs.frontend_tags || 'No tags found' }}```"
                   }
                 }
               ]
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       # 이미지 태그 조회
       - name: Get image tags
