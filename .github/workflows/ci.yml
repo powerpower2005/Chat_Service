@@ -126,11 +126,13 @@ jobs:
           # Backend 이미지 확인
           BACKEND_STATUS=$(curl -s -f -L -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://ghcr.io/v2/${{ env.BACKEND_IMAGE_NAME }}/manifests/${{ steps.version.outputs.version }}")
           
           # Frontend 이미지 확인
           FRONTEND_STATUS=$(curl -s -f -L -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://ghcr.io/v2/${{ env.FRONTEND_IMAGE_NAME }}/manifests/${{ steps.version.outputs.version }}")
           
           # 결과 저장
@@ -226,6 +228,13 @@ jobs:
                 },
                 {
                   "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*푸시된 이미지*\n• Backend: `${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ steps.version.outputs.version }}`\n• Frontend: `${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ steps.version.outputs.version }}`"
+                  }
                 },
                 {
                   "type": "section",
