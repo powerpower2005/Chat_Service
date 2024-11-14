@@ -1,1 +1,184 @@
- 
+name: CI Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE_NAME: ${{ github.repository }}/chat-backend
+  FRONTEND_IMAGE_NAME: ${{ github.repository }}/chat-frontend
+  MAJOR_VERSION: 1
+  MINOR_VERSION: 0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # 빌드 시작 알림
+      - name: Notify build start
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🚀 CI 빌드 시작",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*CI 빌드 시작*\n- 브랜치: ${{ github.ref_name }}\n- 커밋: ${{ github.event.head_commit.message }}"
+                  }
+                }
+              ]
+            }
+
+      # GHCR 로그인
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 현재 버전 확인 및 증가
+      - name: Get current version
+        id: version
+        run: |
+          # API를 통해 현재 태그 목록 가져오기
+          TAGS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/user/packages/container/${{ env.BACKEND_IMAGE_NAME }}/versions" | \
+            jq -r '.[].metadata.container.tags[]' | grep "^${MAJOR_VERSION}.${MINOR_VERSION}." || echo "${MAJOR_VERSION}.${MINOR_VERSION}.0")
+          
+          # 현재 패치 버전 찾기
+          CURRENT_PATCH=$(echo "$TAGS" | sort -V | tail -n1 | cut -d. -f3 || echo "0")
+          NEW_PATCH=$((CURRENT_PATCH + 1))
+          NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.${NEW_PATCH}"
+          echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+
+      # 버전 설정 알림
+      - name: Notify version
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "📌 버전 설정",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*새 버전 설정*\n- 버전: ${{ steps.version.outputs.version }}"
+                  }
+                }
+              ]
+            }
+
+      # Backend 이미지 빌드 & 푸시
+      - name: Build and push backend image
+        id: build-backend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ steps.version.outputs.version }}
+
+      # Backend 빌드 알림
+      - name: Notify backend build
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🔨 Backend 빌드 완료",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Backend 빌드 상태*\n- 버전: ${{ steps.version.outputs.version }}\n- 상태: ${{ steps.build-backend.outcome }}"
+                  }
+                }
+              ]
+            }
+
+      # Frontend 이미지 빌드 & 푸시
+      - name: Build and push frontend image
+        id: build-frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ steps.version.outputs.version }}
+
+      # Frontend 빌드 알림
+      - name: Notify frontend build
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🔨 Frontend 빌드 완료",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Frontend 빌드 상태*\n- 버전: ${{ steps.version.outputs.version }}\n- 상태: ${{ steps.build-frontend.outcome }}"
+                  }
+                }
+              ]
+            }
+
+      # 최종 상태 알림
+      - name: Get image catalog and send final status
+        if: always()
+        run: |
+          # Backend 이미지 태그 조회
+          BACKEND_TAGS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/user/packages/container/${{ env.BACKEND_IMAGE_NAME }}/versions" | \
+            jq -r '.[].metadata.container.tags[]' | sort -V | tail -5)
+          
+          # Frontend 이미지 태그 조회
+          FRONTEND_TAGS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/user/packages/container/${{ env.FRONTEND_IMAGE_NAME }}/versions" | \
+            jq -r '.[].metadata.container.tags[]' | sort -V | tail -5)
+          
+          # Slack 메시지 전송
+          curl -X POST -H 'Content-type: application/json' --data "{
+            \"text\": \"✨ CI 빌드 최종 결과\",
+            \"blocks\": [
+              {
+                \"type\": \"section\",
+                \"text\": {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"*CI 빌드 완료*\n- 버전: ${{ steps.version.outputs.version }}\n- Backend: ${{ steps.build-backend.outcome }}\n- Frontend: ${{ steps.build-frontend.outcome }}\n- 최종 상태: ${{ job.status }}\"
+                }
+              },
+              {
+                \"type\": \"section\",
+                \"text\": {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"*최근 Backend 이미지 태그*\n\`\`\`${BACKEND_TAGS}\`\`\`\"
+                }
+              },
+              {
+                \"type\": \"section\",
+                \"text\": {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"*최근 Frontend 이미지 태그*\n\`\`\`${FRONTEND_TAGS}\`\`\`\"
+                }
+              }
+            ]
+          }" ${{ secrets.SLACK_WEBHOOK_URL }} 
