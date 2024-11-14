@@ -67,34 +67,29 @@ jobs:
       - name: Get current version
         id: version
         run: |
-          # 디버깅을 위한 초기 출력
-          echo "Fetching current version..."
-          
-          # API 응답 전체 저장
+          # GitHub Container Registry API를 통해 현재 버전 확인
           RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/user/packages/container/${{ env.BACKEND_IMAGE_NAME }}/versions")
           
-          echo "API Response: $RESPONSE"
-          
-          # 버전 태그 추출 및 정렬
+          # 최신 버전 태그 추출 (1.0.x 형식의 태그만)
           CURRENT_VERSION=$(echo "$RESPONSE" | \
             jq -r '.[].metadata.container.tags[]' | \
             grep "^${MAJOR_VERSION}.${MINOR_VERSION}." | \
-            sort -V | \
-            tail -n1 || echo "${MAJOR_VERSION}.${MINOR_VERSION}.0")
+            sort -rV | \
+            head -n1 || echo "${MAJOR_VERSION}.${MINOR_VERSION}.0")
           
-          echo "Current version found: $CURRENT_VERSION"
+          echo "Current latest version: $CURRENT_VERSION"
           
           # 패치 버전 증가
-          if [ "$CURRENT_VERSION" = "${MAJOR_VERSION}.${MINOR_VERSION}.0" ]; then
-            NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.0"
+          if [ -z "$CURRENT_VERSION" ]; then
+            NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.1"
           else
-            CURRENT_PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
-            NEW_PATCH=$((CURRENT_PATCH + 1))
+            PATCH_VERSION=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+            NEW_PATCH=$((PATCH_VERSION + 1))
             NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.${NEW_PATCH}"
           fi
           
-          echo "Setting new version: $NEW_VERSION"
+          echo "New version will be: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       # 버전 설정 알림
