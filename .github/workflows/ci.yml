@@ -1,10 +1,20 @@
 name: CI Build
 
+
+# backend 또는 frontend 디렉토리 내의 파일이 변경된 경우에만 실행
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
 
 env:
   REGISTRY: ghcr.io
