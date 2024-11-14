@@ -8,8 +8,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE_NAME: ${{ github.repository }}/chat-backend
-  FRONTEND_IMAGE_NAME: ${{ github.repository }}/chat-frontend
+  BACKEND_IMAGE_NAME: ${{ github.repository_owner }}/chat_service/chat-backend
+  FRONTEND_IMAGE_NAME: ${{ github.repository_owner }}/chat_service/chat-frontend
   MAJOR_VERSION: 1
   MINOR_VERSION: 0
   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
