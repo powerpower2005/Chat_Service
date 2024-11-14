@@ -119,6 +119,54 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
+      # 이미지 푸시 확인 및 Slack 알림
+      - name: Verify image push and notify
+        id: verify-push
+        run: |
+          # Backend 이미지 확인
+          BACKEND_STATUS=$(curl -s -f -L -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${{ env.BACKEND_IMAGE_NAME }}/manifests/${{ steps.version.outputs.version }}")
+          
+          # Frontend 이미지 확인
+          FRONTEND_STATUS=$(curl -s -f -L -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${{ env.FRONTEND_IMAGE_NAME }}/manifests/${{ steps.version.outputs.version }}")
+          
+          # 결과 저장
+          echo "backend_exists=$([[ $BACKEND_STATUS == "200" ]] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "frontend_exists=$([[ $FRONTEND_STATUS == "200" ]] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+
+      - name: Send push verification result
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "이미지 푸시 확인 결과",
+              "username": "GitHub Actions",
+              "icon_emoji": ":docker:",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🐳 이미지 푸시 확인 결과",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*버전 ${{ steps.version.outputs.version }} 확인 결과*\n• Backend: ${{ steps.verify-push.outputs.backend_exists && '✅ 성공' || '❌ 실패' }}\n• Frontend: ${{ steps.verify-push.outputs.frontend_exists && '✅ 성공' || '❌ 실패' }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
       # Frontend 이미지 빌드 & 푸시
       - name: Build and push frontend image
         id: build-frontend
