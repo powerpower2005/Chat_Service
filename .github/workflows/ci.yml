@@ -57,29 +57,35 @@ jobs:
       - name: Get current version
         id: version
         run: |
-          # API로 현재 태그 목록 가져오기
-          CURRENT_VERSION=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/user/packages/container/${{ env.BACKEND_IMAGE_NAME }}/versions" | \
+          # 디버깅을 위한 초기 출력
+          echo "Fetching current version..."
+          
+          # API 응답 전체 저장
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/user/packages/container/${{ env.BACKEND_IMAGE_NAME }}/versions")
+          
+          echo "API Response: $RESPONSE"
+          
+          # 버전 태그 추출 및 정렬
+          CURRENT_VERSION=$(echo "$RESPONSE" | \
             jq -r '.[].metadata.container.tags[]' | \
             grep "^${MAJOR_VERSION}.${MINOR_VERSION}." | \
             sort -V | \
             tail -n1 || echo "${MAJOR_VERSION}.${MINOR_VERSION}.0")
           
-          # 현재 패치 버전 추출 및 증가
-          if [ -n "$CURRENT_VERSION" ]; then
+          echo "Current version found: $CURRENT_VERSION"
+          
+          # 패치 버전 증가
+          if [ "$CURRENT_VERSION" = "${MAJOR_VERSION}.${MINOR_VERSION}.0" ]; then
+            NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.0"
+          else
             CURRENT_PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
             NEW_PATCH=$((CURRENT_PATCH + 1))
-          else
-            NEW_PATCH=0
+            NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.${NEW_PATCH}"
           fi
           
-          # 새 버전 설정
-          NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.${NEW_PATCH}"
-          echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-          
-          # 디버깅용 출력
-          echo "Current version: $CURRENT_VERSION"
-          echo "New version: $NEW_VERSION"
+          echo "Setting new version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       # 버전 설정 알림
       - name: Notify version
@@ -136,17 +142,29 @@ jobs:
       - name: Verify image push and notify
         id: verify-push
         run: |
-          # Backend 이미지 확인
-          BACKEND_STATUS=$(curl -s -f -L -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-            "https://ghcr.io/v2/${{ env.BACKEND_IMAGE_NAME }}/manifests/${{ steps.version.outputs.version }}")
+          # 함수 정의
+          check_image() {
+            local IMAGE_NAME=$1
+            local VERSION=$2
+            local STATUS
+            
+            STATUS=$(curl -s -L -w "%{http_code}" \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+              "https://ghcr.io/v2/${IMAGE_NAME}/manifests/${VERSION}" \
+              -o /dev/null || echo "000")
+            
+            echo $STATUS
+          }
           
-          # Frontend 이미지 확인
-          FRONTEND_STATUS=$(curl -s -f -L -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-            "https://ghcr.io/v2/${{ env.FRONTEND_IMAGE_NAME }}/manifests/${{ steps.version.outputs.version }}")
+          # 이미지 확인
+          echo "Checking Backend image..."
+          BACKEND_STATUS=$(check_image "${{ env.BACKEND_IMAGE_NAME }}" "${{ steps.version.outputs.version }}")
+          echo "Backend status: $BACKEND_STATUS"
+          
+          echo "Checking Frontend image..."
+          FRONTEND_STATUS=$(check_image "${{ env.FRONTEND_IMAGE_NAME }}" "${{ steps.version.outputs.version }}")
+          echo "Frontend status: $FRONTEND_STATUS"
           
           # 결과 저장
           echo "backend_exists=$([[ $BACKEND_STATUS == "200" ]] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
