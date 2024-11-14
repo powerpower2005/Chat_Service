@@ -1,14 +1,19 @@
 # 빌드 스테이지
-FROM node:16 as build-stage
+FROM node:18-alpine as builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
-RUN npm install --save-dev @babel/core @babel/eslint-parser
 COPY . .
 RUN npm run build
 
 # 프로덕션 스테이지
-FROM nginx:stable-alpine as production-stage
-COPY --from=build-stage /app/dist /usr/share/nginx/html
-EXPOSE 80
+FROM nginx:alpine
+COPY --from=builder /app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# NGINX 설정에서 AIO 비활성화
+RUN echo "worker_processes 1;" > /etc/nginx/nginx.conf \
+    && echo "events { worker_connections 1024; use epoll; }" >> /etc/nginx/nginx.conf
+
+EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]

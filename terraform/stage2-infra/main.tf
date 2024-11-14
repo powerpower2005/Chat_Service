@@ -14,11 +14,11 @@ resource "kubernetes_namespace" "chat_dev" {
 }
 
 module "mongodb" {
-  source    = "../../modules/mongodb"
+  source    = "../modules/mongodb"
   namespace = kubernetes_namespace.chat_dev.metadata[0].name
 }
 
 module "redis" {
-  source    = "../../modules/redis"
+  source    = "../modules/redis"
   namespace = kubernetes_namespace.chat_dev.metadata[0].name
 } 

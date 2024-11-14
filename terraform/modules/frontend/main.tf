@@ -24,6 +24,7 @@ resource "kubernetes_deployment" "frontend" {
         container {
           name  = "frontend"
           image = var.image
+          image_pull_policy = "Always"
 
           port {
             container_port = 3000
@@ -33,6 +34,30 @@ resource "kubernetes_deployment" "frontend" {
             secret_ref {
               name = "app-secrets"
             }
+          }
+
+          resources {
+            limits = {
+              cpu    = "200m"
+              memory = "256Mi"
+            }
+            requests = {
+              cpu    = "100m"
+              memory = "128Mi"
+            }
+          }
+
+          env {
+            name  = "NGINX_WORKER_PROCESSES"
+            value = "1"
+          }
+          env {
+            name  = "NGINX_WORKER_CONNECTIONS"
+            value = "1024"
+          }
+          env {
+            name  = "NGINX_WORKER_AIO"
+            value = "off"
           }
         }
       }
@@ -56,6 +81,7 @@ resource "kubernetes_service" "frontend" {
     port {
       port        = 3000
       target_port = 3000
+      node_port   = 30000
     }
   }
 } 
