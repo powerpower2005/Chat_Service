@@ -6,10 +6,10 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# 프로덕션 스테이지
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/nginx.conf
+# serve 패키지 설치
+RUN npm install -g serve
 
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 3000
+
+# serve로 dist 폴더 서빙
+CMD ["serve", "-s", "dist", "-l", "3000"]
