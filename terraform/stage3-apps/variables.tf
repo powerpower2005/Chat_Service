@@ -10,3 +10,9 @@ variable "backend_version" {
   type        = string
   default     = "latest"
 }
+
+variable "github_username" {
+  description = "GitHub username for container registry"
+  type        = string
+  default     = "powerpower2005"
+}
