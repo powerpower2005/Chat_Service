@@ -64,23 +64,18 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # 현재 버전 확인 및 증가
-      - name: Get current version
+      - name: Get current version and set new version
         id: version
         run: |
-          # GitHub Container Registry API를 통해 현재 버전 확인
-          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/user/packages/container/${{ env.BACKEND_IMAGE_NAME }}/versions")
-          
-          # 최신 버전 태그 추출 (1.0.x 형식의 태그만)
-          CURRENT_VERSION=$(echo "$RESPONSE" | \
+          # GitHub Container Registry에서 현재 버전 확인
+          CURRENT_VERSION=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/user/packages/container/${{ env.BACKEND_IMAGE_NAME }}/versions" | \
             jq -r '.[].metadata.container.tags[]' | \
             grep "^${MAJOR_VERSION}.${MINOR_VERSION}." | \
             sort -rV | \
             head -n1 || echo "${MAJOR_VERSION}.${MINOR_VERSION}.0")
           
-          echo "Current latest version: $CURRENT_VERSION"
-          
-          # 패치 버전 증가
+          # 새 버전 계산
           if [ -z "$CURRENT_VERSION" ]; then
             NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.1"
           else
@@ -89,6 +84,7 @@ jobs:
             NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.${NEW_PATCH}"
           fi
           
+          echo "Current latest version: $CURRENT_VERSION"
           echo "New version will be: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
