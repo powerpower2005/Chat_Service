@@ -63,25 +63,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 현재 버전 확인 및 증가
+      # 버전 변수 설정
+      - name: Set version variables
+        id: version_vars
+        run: |
+          echo "MAJOR_VERSION=${{ env.MAJOR_VERSION }}" >> $GITHUB_OUTPUT
+          echo "MINOR_VERSION=${{ env.MINOR_VERSION }}" >> $GITHUB_OUTPUT
+
+      # 현재 버전 확인 및 새 버전 설정
       - name: Get current version and set new version
         id: version
         run: |
-          # GitHub Container Registry에서 현재 버전 확인
+          # 현재 버전 확인
           CURRENT_VERSION=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/user/packages/container/${{ env.BACKEND_IMAGE_NAME }}/versions" | \
+            "https://api.github.com/user/packages/container/${{ env.FRONTEND_IMAGE_NAME }}/versions" | \
             jq -r '.[].metadata.container.tags[]' | \
-            grep "^${MAJOR_VERSION}.${MINOR_VERSION}." | \
-            sort -rV | \
-            head -n1 || echo "${MAJOR_VERSION}.${MINOR_VERSION}.0")
+            grep "^${{ env.MAJOR_VERSION }}\.${{ env.MINOR_VERSION }}\." | \
+            sort -V | \
+            tail -n1 || echo "${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.0")
           
-          # 새 버전 계산
-          if [ -z "$CURRENT_VERSION" ]; then
-            NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.1"
+          echo "Current latest version: $CURRENT_VERSION"
+          
+          # 패치 버전 증가
+          if [ "$CURRENT_VERSION" = "${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.0" ]; then
+            NEW_VERSION="${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.1"
           else
             PATCH_VERSION=$(echo "$CURRENT_VERSION" | cut -d. -f3)
             NEW_PATCH=$((PATCH_VERSION + 1))
-            NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.${NEW_PATCH}"
+            NEW_VERSION="${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.$NEW_PATCH"
           fi
           
           echo "Current latest version: $CURRENT_VERSION"
