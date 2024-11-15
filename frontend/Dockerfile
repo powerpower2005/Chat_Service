@@ -14,6 +14,6 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # NGINX 설정에서 AIO 비활성화 
 RUN echo "worker_processes 1;" > /etc/nginx/nginx.conf \
     && echo "events { worker_connections 1024; use epoll; }" >> /etc/nginx/nginx.conf
-
+ 
 EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]
