@@ -32,8 +32,8 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v4
 
       # 빌드 시작 알림
       - name: Notify build start
@@ -74,35 +74,30 @@ jobs:
       - name: Get current version and set new version
         id: version
         run: |
-          echo "Checking image tags..."
-          API_RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/user/packages/container/${{ env.FRONTEND_IMAGE_NAME }}/tags")
-          echo "API Response:"
-          echo "$API_RESPONSE"
+          # 현재 버전 읽기
+          CURRENT_VERSION=$(jq -r '.version' version.json)
+          echo "Current version: $CURRENT_VERSION"
           
-          # 특정 태그 패턴(1.0.*)을 찾아서 가장 최신 버전 추출
-          CURRENT_VERSION=$(echo "$API_RESPONSE" | \
-            jq -r '.[] | select(.name | startswith("${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.")) | .name' | \
-            sort -V | tail -n1 || echo "${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.0")
+          # 현재 버전에서 패치 버전만 추출하여 증가
+          PATCH_VERSION=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+          NEW_PATCH=$((PATCH_VERSION + 1))
           
-          echo "Extracted current version: $CURRENT_VERSION"
-          
-          # 버전이 비어있거나 에러인 경우 초기 버전으로 설정
-          if [ -z "$CURRENT_VERSION" ] || [ "$CURRENT_VERSION" = "null" ]; then
-            echo "No valid version found, using initial version"
-            CURRENT_VERSION="${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.0"
-          fi
-          
-          # 패치 버전 증가
-          if [ "$CURRENT_VERSION" = "${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.0" ]; then
-            NEW_VERSION="${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.1"
-          else
-            PATCH_VERSION=$(echo "$CURRENT_VERSION" | cut -d. -f3)
-            NEW_PATCH=$((PATCH_VERSION + 1))
-            NEW_VERSION="${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.$NEW_PATCH"
-          fi
-          
+          # 새 버전 설정
+          NEW_VERSION="${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.$NEW_PATCH"
           echo "New version will be: $NEW_VERSION"
+          
+          # version.json 업데이트
+          jq --arg version "$NEW_VERSION" '.version = $version' version.json > version.json.tmp
+          mv version.json.tmp version.json
+          
+          # 변경사항을 커밋
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add version.json
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          git push
+          
+          # 새 버전을 workflow 출력으로 설정
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       # 버전 설정 알림
