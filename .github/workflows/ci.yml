@@ -74,16 +74,16 @@ jobs:
       - name: Get current version and set new version
         id: version
         run: |
-          # API 응답 전체 출력
-          echo "API Response:"
+          echo "Checking image tags..."
           API_RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/user/packages/container/${{ env.FRONTEND_IMAGE_NAME }}/versions")
-          echo "$API_RESPONSE" | jq '.'
+            "https://api.github.com/user/packages/container/${{ env.FRONTEND_IMAGE_NAME }}/tags")
+          echo "API Response:"
+          echo "$API_RESPONSE"
           
-          # 현재 버전 확인 시도
+          # 특정 태그 패턴(1.0.*)을 찾아서 가장 최신 버전 추출
           CURRENT_VERSION=$(echo "$API_RESPONSE" | \
-            jq -r '.[0].metadata.container.tags[0]' || \
-            echo "${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.0")
+            jq -r '.[] | select(.name | startswith("${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.")) | .name' | \
+            sort -V | tail -n1 || echo "${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.0")
           
           echo "Extracted current version: $CURRENT_VERSION"
           
@@ -102,7 +102,6 @@ jobs:
             NEW_VERSION="${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.$NEW_PATCH"
           fi
           
-          echo "Current latest version: $CURRENT_VERSION"
           echo "New version will be: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
