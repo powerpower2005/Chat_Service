@@ -34,6 +34,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
 
       # 빌드 시작 알림
       - name: Notify build start
@@ -74,7 +76,7 @@ jobs:
       - name: Get current version and set new version
         id: version
         run: |
-          # 현재 버전 읽기
+          echo "Reading current version from version.json..."
           CURRENT_VERSION=$(jq -r '.version' version.json)
           echo "Current version: $CURRENT_VERSION"
           
@@ -87,10 +89,16 @@ jobs:
           echo "New version will be: $NEW_VERSION"
           
           # version.json 업데이트
+          echo "Updating version.json..."
           jq --arg version "$NEW_VERSION" '.version = $version' version.json > version.json.tmp
           mv version.json.tmp version.json
           
+          # 변경된 내용 확인
+          echo "Updated version.json content:"
+          cat version.json
+          
           # 변경사항을 커밋
+          echo "Committing changes..."
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add version.json
